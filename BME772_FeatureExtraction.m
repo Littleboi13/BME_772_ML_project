@@ -90,3 +90,5 @@ function [spectral_Entropy, PSD, FT] = feature_domain_spectral_features(signal, 
         FT(ch,:) = abs(fft(x)).^2;  % power spectrum (FFT returns complex: abs(FFT) = magnitude (sqrt(Re^2+Im^2)); squaring gives power)
     end
 end
+
+
