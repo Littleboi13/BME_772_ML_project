@@ -1,6 +1,6 @@
 %% BME 772 Final Project Filtering Code
 % Data Truncation -> *Filtering* -> Feature Extraction -> Machine Learning
-% Filtering: Detrend -> Notch (Fundamental + Harmonic) -> Bandpass -> ICA
+% Filtering: Detrend -> Notch (Fundamental + Harmonic) -> Bandpass
 % Student IDs: Jacklyn D'Ascenzo (xxxxx7753), Mya Hao (xxxxx8133), Tanvir Hassan (xxxxx4056), Janneza Macaalay (xxxxx2196)
 
 %% Detrending and Removal of DC Offset
@@ -82,55 +82,6 @@ function sig_bp = broad_bandpass(signal, Fs)
 
     for ch = 1:size(signal, 1)
         sig_bp(ch,:)  = filtfilt(bB, aB, double(signal(ch, :)));
-    end
-end
-
-%% Independent Component Analysis
-function ICA_sig = ICA(signal)
-    if size(signal, 1) == 1
-        warning("ICA cannot run with only one channel. Returning original signal.");
-        ICA_sig = signal;
-        return;
-    end
-
-    % Transpose for ICA (rows = samples, columns = channels)
-    X = signal';
-
-    % Remove channels that are all NaN, Inf, or constant
-    rowsToKeep = ~all(isnan(X) | isinf(X) | X==0, 2) & std(X,0,2)~=0;
-    X_clean = X(rowsToKeep, :);
-
-    if isempty(X_clean)
-        warning("All channels are invalid after cleaning. Returning original signal.");
-        ICA_sig = signal;
-        return;
-    end
-
-    % Check rank
-    rankX = rank(X_clean);
-    if rankX < size(X_clean, 2)
-        % Add tiny jitter to break exact linear dependence
-        X_clean = X_clean + 1e-12*randn(size(X_clean));
-    end
-
-    % Use PCA only to reduce dimensionality if necessary
-    [~, score] = pca(X_clean, 'Economy', true);
-    numComp = min(rank(X_clean), size(score,2));
-    score = score(:, 1:numComp);
-
-    % Run RICA with high iteration limit and small regularization
-    Mdl = rica(score, numComp, 'Lambda', 1e-4, 'IterationLimit', 5000, 'Standardize', true, 'Verbose', 0);
-    IC = transform(Mdl, score);
-
-    % Return to original format (channels x samples)
-    ICA_sig = IC';
-
-    % Normalization of ICA for ML
-    for ch = 1:size(ICA_sig,1)
-        maxVal = max(abs(ICA_sig(ch,:)));
-        if maxVal > 0
-            ICA_sig(ch,:) = ICA_sig(ch,:) ./ maxVal;  % normalize to ±1
-        end
     end
 end
 
