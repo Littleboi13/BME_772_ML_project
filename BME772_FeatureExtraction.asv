@@ -71,11 +71,80 @@ function [spectral_Entropy, PSD, FT] = feature_domain_spectral_features(signal, 
 
     % Preallocate output variables
     spectral_Entropy = zeros(numCh, 1);
-    PSD = zeros(numCh, 1);
-    FT = zeros(numCh, 1);
+    nfft = max(2^nextpow2(Fs), 1024);
+    PSD = zeros(numCh, nfft/2+1);  
+    FT  = zeros(numCh, nSamples); 
+
+    winLength = min(round(Fs*2), length(signal));  % window max 2 sec or signal length
+    overlap   = floor(winLength/2);
+    f = linspace(0, Fs/2, nfft/2+1);
     
     for ch = 1:numCh
         x = signal(ch, :);
-        spectral_Entropy(ch) = spec
+        % Spectral Entropy
+        spectral_Entropy(ch) = spectralEntropy(x, Fs);
+        % Power Spectral Density
+        [Pxx, ~] = pwelch(x, hamming(winLength), overlap, nfft, Fs);
+        PSD(ch,:) = Pxx;
+        % Fourier Transform
+        FT(ch,:) = abs(fft(x)).^2;  % power spectrum (FFT returns complex: abs(FFT) = magnitude (sqrt(Re^2+Im^2)); squaring gives power)
     end
 end
+
+%% Extracting the features
+Fs = 256; % Sampled at 256 samples per second
+inputDir = 'data_truncated';
+outputDir = "Dataset";
+
+files = dir(fullfile(inputDir, '**', '*.mat'));
+fprintf("Found %d files.\n", numel(files));
+
+%% Start filing
+for i = 1:numel(files)
+    fprintf("\nProcessing %d of %d: %s\n", i, numel(files), files(i).name);
+    % 1. Extracting the EEG
+    filePath = fullfile(files(i).folder, files(i).name);
+    data = load(filePath);
+    
+    if ~isfield(data, 'segment')
+        warning("File %s has no 'segment' field. Skipping.\n", files(i).name);
+        continue;
+    end
+
+    eeg = data.segment;   
+
+    % 2. Detrending and DC Offset Removal
+    clean_eeg = cleaning(eeg);
+
+    % 3. Finding the Powerline Noise
+    [lineFund, lineHarm] = detect_line_frequency(clean_eeg, Fs);
+
+    % 4. Notch Filter for Powerline Noise
+    notch_eeg = apply_notch(clean_eeg, Fs, lineFund, lineHarm);
+
+    % 5. Broad Bandpass
+    bp_eeg = broad_bandpass(notch_eeg, Fs);
+
+    % 7. Saving the Clean Signals
+        % Creating the New Subfolders
+    relPath = files(i).folder(length(inputDir)+1:end);
+    if startsWith(relPath, filesep)
+        relPath = relPath(2:end);
+    end
+
+        % Path for the New Subfolder
+    outFolder = fullfile(outputDir, relPath);
+
+        % Create a New Folder if it Does Not Exist
+    if ~exist(outFolder, 'dir')
+        mkdir(outFolder);
+    end
+        % Names for the New Filtered Data
+    [~, base, ~] = fileparts(files(i).name);
+    outFile = fullfile(outFolder, base + "_filtered.mat"); 
+
+    bp_eeg_transposed = bp_eeg'; % Transpose the matrix before saving
+    save(outFile, "bp_eeg_transposed"); % Append the transposed data
+
+end
+

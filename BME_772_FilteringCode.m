@@ -139,49 +139,49 @@ for i = 1:numel(files)
     bp_eeg_transposed = bp_eeg'; % Transpose the matrix before saving
     save(outFile, "bp_eeg_transposed"); % Append the transposed data
 
-    % Plotting only the first EEG signal
-    if i == 1
-        fprintf("Plotting first file: %s\n", files(i).name);
-         
-        t = (0:size(eeg,2)-1) / Fs;   % time axis
-
-        figure;
-        subplot(2,1,1);
-        plot(t, eeg(1,:), "Color", "#9267FF");   % Channel 1
-        title('Raw Input EEG Data (Channel 1)');
-        xlabel('Time (s)');
-        ylabel('Amplitude');
-        ylim([-600 600])
-        grid on;
-
-        subplot(2,1,2);
-        plot(t, bp_eeg(1,:), "Color", "#9267FF");
-        title('Bandpass Filtered EEG Data (Channel 1)');
-        xlabel('Time (s)');
-        ylabel('Amplitude');
-        ylim([-600 600])
-        grid on;
-
-        sgtitle(sprintf('EEG Processing Stages for: %s', files(i).name), 'Interpreter', 'none');
-
-        % Frequency Plots
-        figure;
-        subplot(2,1,1);
-        [pxx_raw, f_raw] = pwelch(eeg(1,:), hamming(1024), 512, 1024, Fs);
-        plot(f_raw, 10*log10(pxx_raw), "Color", "#9267FF", "LineWidth", 1.3);
-        grid on;
-        xlabel('Frequency (Hz)');
-        ylabel('PSD (dB/Hz)');
-        title('Raw Input EEG PSD (Channel 1)');
-        
-        subplot(2,1,2);
-        [pxx_bp, f_bp] = pwelch(bp_eeg(1,:), hamming(1024), 512, 1024, Fs);
-        plot(f_bp, 10*log10(pxx_bp), "Color", "#9267FF", "LineWidth", 1.3);
-        grid on;
-        xlabel('Frequency (Hz)');
-        ylabel('PSD (dB/Hz)');
-        title('Bandpass Filtered EEG PSD (Channel 1)');
-        
-        sgtitle(sprintf('EEG PSD Stages for: %s', files(i).name), 'Interpreter', 'none');
-    end
+    % % Plotting only the first EEG signal
+    % if i == 1
+    %     fprintf("Plotting first file: %s\n", files(i).name);
+    % 
+    %     t = (0:size(eeg,2)-1) / Fs;   % time axis
+    % 
+    %     figure;
+    %     subplot(2,1,1);
+    %     plot(t, eeg(1,:), "Color", "#9267FF");   % Channel 1
+    %     title('Raw Input EEG Data (Channel 1)');
+    %     xlabel('Time (s)');
+    %     ylabel('Amplitude');
+    %     ylim([-600 600])
+    %     grid on;
+    % 
+    %     subplot(2,1,2);
+    %     plot(t, bp_eeg(1,:), "Color", "#9267FF");
+    %     title('Bandpass Filtered EEG Data (Channel 1)');
+    %     xlabel('Time (s)');
+    %     ylabel('Amplitude');
+    %     ylim([-600 600])
+    %     grid on;
+    % 
+    %     sgtitle(sprintf('EEG Processing Stages for: %s', files(i).name), 'Interpreter', 'none');
+    % 
+    %     % Frequency Plots
+    %     figure;
+    %     subplot(2,1,1);
+    %     [pxx_raw, f_raw] = pwelch(eeg(1,:), hamming(1024), 512, 1024, Fs);
+    %     plot(f_raw, 10*log10(pxx_raw), "Color", "#9267FF", "LineWidth", 1.3);
+    %     grid on;
+    %     xlabel('Frequency (Hz)');
+    %     ylabel('PSD (dB/Hz)');
+    %     title('Raw Input EEG PSD (Channel 1)');
+    % 
+    %     subplot(2,1,2);
+    %     [pxx_bp, f_bp] = pwelch(bp_eeg(1,:), hamming(1024), 512, 1024, Fs);
+    %     plot(f_bp, 10*log10(pxx_bp), "Color", "#9267FF", "LineWidth", 1.3);
+    %     grid on;
+    %     xlabel('Frequency (Hz)');
+    %     ylabel('PSD (dB/Hz)');
+    %     title('Bandpass Filtered EEG PSD (Channel 1)');
+    % 
+    %     sgtitle(sprintf('EEG PSD Stages for: %s', files(i).name), 'Interpreter', 'none');
+    % end
 end

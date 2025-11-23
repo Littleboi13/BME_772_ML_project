@@ -91,4 +91,62 @@ function [spectral_Entropy, PSD, FT] = feature_domain_spectral_features(signal, 
     end
 end
 
+%% Extracting the features
+Fs = 256; % Sampled at 256 samples per second
+inputDir = 'data_truncated';
+outputDir = "Dataset";
+
+files = dir(fullfile(inputDir, '**', '*.mat'));
+fprintf("Found %d files.\n", numel(files));
+
+%% Start filing
+for i = 1:numel(files)
+    fprintf("\nProcessing %d of %d: %s\n", i, numel(files), files(i).name);
+    % 1. Extracting the EEG
+    filePath = fullfile(files(i).folder, files(i).name);
+    data = load(filePath);
+    
+    if ~isfield(data, 'segment')
+        warning("File %s has no 'segment' field. Skipping.\n", files(i).name);
+        continue;
+    end
+
+    eeg = data.segment; 
+    
+    % 2. Extracting features
+    [meanEEG, stdEEG, first_D, second_D, AR_coeff] = time_domain_features(eeg);
+    [alpha_fPower, beta_fPower, gamma_fPower, delta_fPower, theta_fPower] = feature_domain_bandPower(eeg, Fs);
+    [spectral_Entropy, PSD, FT] = feature_domain_spectral_features(eeg, Fs);
+
+    % 2. Saving the extracted features
+    features = table(meanEEG, stdEEG, first_D, second_D, AR_coeff, ...
+                     alpha_fPower, beta_fPower, gamma_fPower, ...
+                     delta_fPower, theta_fPower, spectral_Entropy, ...
+                     'VariableNames', {'MeanEEG', 'StdEEG', 'FirstDifference', ...
+                     'SecondDifference', 'ARCoefficients', 'AlphaPower', ...
+                     'BetaPower', 'GammaPower', 'DeltaPower', ...
+                     'ThetaPower', 'SpectralEntropy'});
+    writetable(features, outFile)
+
+    % 3. Saving the features
+        % Creating the New Subfolders
+    relPath = files(i).folder(length(inputDir)+1:end);
+    if startsWith(relPath, filesep)
+        relPath = relPath(2:end);
+    end
+
+        % Path for the New Subfolder
+    outFolder = fullfile(outputDir, relPath);
+
+        % Create a New Folder if it Does Not Exist
+    if ~exist(outFolder, 'dir')
+        mkdir(outFolder);
+    end
+        % Names for the New Filtered Data
+    [~, base, ~] = fileparts(files(i).name);
+    outFile = fullfile(outFolder, base + ".csv"); 
+
+    save(outFile, "bp_eeg_"); % Append the transposed data
+
+end
 
