@@ -1,0 +1,81 @@
+%% BME 772 Final Project Filtering Code
+% Data Truncation -> Filtering -> *Feature Extraction* -> Machine Learning
+% Feature Extraction: Time Domain, Frequency Domain, Decomposition Domain, Time-Frequency Domain, Nonlinear/Dynamical
+% Student IDs: Jacklyn D'Ascenzo (xxxxx7753), Mya Hao (xxxxx8133), Tanvir Hassan (xxxxx4056), Janneza Macaalay (xxxxx2196)
+
+%% Time Domain Feature Extraction
+function [meanEEG, stdEEG, first_D, second_D, AR_coeff] = time_domain_features(signal)
+    numCh = size(signal, 1); 
+    numSamples = size(signal, 2);
+
+    % Preallocate output variables
+    meanEEG = zeros(numCh, 1);
+    stdEEG = zeros(numCh, 1);
+    first_D = zeros(numCh, numSamples-1);
+    second_D = zeros(numCh, numSamples-2);
+    AR_coeff = cell(numCh, 1);
+    
+    for ch = 1:numCh
+        x = signal(ch,:);
+
+        % 1. Mean and Standard Deviation
+        meanEEG(ch) = mean(x);
+        stdEEG(ch) = std(x);
+
+        % 2. First and Second Differences
+        first_D(ch, :) = diff(x, 1);
+        second_D(ch, :) = diff(x, 2);
+
+        % 3. Determine AR order using AIC
+        N = length(x);
+        pmax = 10;
+        AIC = zeros(pmax, 1);
+        for p = 1:pmax
+            [~, e] = aryule(x, p); % AR model
+            AIC(p) = 2*p + N*log(e); % AIC formula
+        end
+        [~, AR_order_opt] = min(AIC);
+
+        % 4. Compute AR coefficients with optimal order
+        [a, ~] = aryule(x, AR_order_opt);
+        AR_coeff{ch} = -a(2:end);  % exclude leading 1, store as row vector
+    end
+end
+
+%% Frequency Domain Feature Extraction
+function [alpha_fPower, beta_fPower, gamma_fPower, delta_fPower, theta_fPower] = feature_domain_bandPower(signal, Fs)
+    % α = 8–13 Hz; β = 13–30Hz; γ = 30–100Hz; δ = 0.5–4Hz; θ = 4–8Hz;
+    signal = double(signal);
+    numCh = size(signal, 1);
+
+    % Preallocate output variables
+    alpha_fPower = zeros(numCh, 1);
+    beta_fPower  = zeros(numCh, 1);
+    gamma_fPower = zeros(numCh, 1);
+    delta_fPower = zeros(numCh, 1);
+    theta_fPower = zeros(numCh, 1);
+
+    for ch = 1:numCh
+        x = signal(ch,:);
+        alpha_fPower(ch) = bandpower(x, Fs, [8 13]);
+        beta_fPower(ch)  = bandpower(x, Fs, [13 30]);
+        gamma_fPower(ch) = bandpower(x, Fs, [30 100]);
+        delta_fPower(ch) = bandpower(x, Fs, [0.5 4]);
+        theta_fPower(ch) = bandpower(x, Fs, [4 8]);
+    end
+end
+
+function [spectral_Entropy, PSD, FT] = feature_domain_spectral_features(signal, Fs)
+    signal = double(signal);
+    numCh = size(signal, 1);
+
+    % Preallocate output variables
+    spectral_Entropy = zeros(numCh, 1);
+    PSD = zeros(numCh, 1);
+    FT = zeros(numCh, 1);
+    
+    for ch = 1:numCh
+        x = signal(ch, :);
+        spectral_Entropy(ch) = spec
+    end
+end
