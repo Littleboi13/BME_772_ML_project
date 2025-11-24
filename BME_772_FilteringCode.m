@@ -136,8 +136,8 @@ for i = 1:numel(files)
     [~, base, ~] = fileparts(files(i).name);
     outFile = fullfile(outFolder, base + "_filtered.mat"); 
 
-    bp_eeg_transposed = bp_eeg'; % Transpose the matrix before saving
-    save(outFile, "bp_eeg_transposed"); % Append the transposed data
+     % Transpose the matrix before saving
+    save(outFile, "bp_eeg"); % Append the transposed data
 
     % % Plotting only the first EEG signal
     % if i == 1
