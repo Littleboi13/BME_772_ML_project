@@ -70,6 +70,8 @@ function sig_filtered = apply_notch(signal, Fs, lineFreqFund, lineFreqHarm)
 
         sig_filtered(ch, :) = sig;
         
+    end
+end
     % Plotting the Notch Filter Frequency Response
     [hF, fF] = freqz(bF, aF, 1024, 'half'); % Frequency response for fundamental notch
     [hH, fH] = freqz(bH, aH, 1024, 'half'); % Frequency response for harmonic notch
@@ -97,8 +99,6 @@ function sig_filtered = apply_notch(signal, Fs, lineFreqFund, lineFreqHarm)
     ylabel('Phase (radians)');
     xlim([0 Fs/2]);
     legend('Fundamental Notch', 'Harmonic Notch');
-    end
-end
 %% Bandpass Filtering
     % Broad Bandpass for Removing Baseline Drift and High Frequency EMG Noise
 function sig_bp = broad_bandpass(signal, Fs)
