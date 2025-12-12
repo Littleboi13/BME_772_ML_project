@@ -69,7 +69,7 @@ end
 %% Frequency Domain Feature Extraction
     % Power of Each Frequency Band
 function [alpha_fPower, beta_fPower, gamma_fPower, delta_fPower, theta_fPower] = feature_domain_bandPower(signal, Fs)
-    % α = 8–13 Hz; β = 13–30Hz; γ = 30–100Hz; δ = 0.5–4Hz; θ = 4–8Hz;
+    % α = 8–13 Hz; β = 13–30 Hz; γ = 30–100 Hz; δ = 0.5–4 Hz; θ = 4–8 Hz;
     signal = double(signal);
     numCh = size(signal, 1);
 
@@ -124,13 +124,9 @@ function [d_a, d_b, d_g, d_t, t_a, t_b, t_g, a_b, a_g, b_g, b_at, t_ab, dt_ab, l
 end
 
     % Spectral Features
-function [ PSD, PSD_norm, FT, FT_norm, totalPower] = feature_domain_spectral_features(signal, Fs)
-
+function [PSD, PSD_norm, FT, FT_norm, totalPower] = feature_domain_spectral_features(signal, Fs)
     signal = double(signal);
     [numCh, nSamples] = size(signal);
-
-    % Spectral entropy
-    % spectralEntropy = zeros(numCh, 1);
 
     % FFT and PSD settings
     nfft = max(2^nextpow2(nSamples), 1024);
@@ -153,25 +149,21 @@ function [ PSD, PSD_norm, FT, FT_norm, totalPower] = feature_domain_spectral_fea
     for ch = 1:numCh
         x = signal(ch, :);
 
-        % % 1. Spectral Entropy
-        % specEntropyArr(ch) = spectralEntropy(x, Fs);
-
-
-        % 2. PSD 
+        % 1. PSD 
         [Pxx, ~] = pwelch(x, hamming(winLength), overlap, nfft, Fs);
         PSD(ch,:) = Pxx;
 
         % Normalized PSD
         PSD_norm(ch,:) = Pxx ./ sum(Pxx);
 
-        % 3. FFT Power Spectrum
+        % 2. FFT Power Spectrum
         X = abs(fft(x)).^2;
         FT(ch,:) = X;
 
         % Normalized FFT
         FT_norm(ch,:) = X ./ sum(X);
 
-        % 4. Total Power
+        % 3. Total Power
         df = Fs / nfft;
         totalPower(ch) = sum(Pxx)*df; %∫PSD df
     end

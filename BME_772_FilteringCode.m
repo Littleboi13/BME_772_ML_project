@@ -27,21 +27,38 @@ function [lineFreqFund, lineFreqHarm] = detect_line_frequency(signal, Fs)
     winLength = min(desiredWin, length(ref));   
     win = hamming(winLength);
     overlap = floor(winLength*0.5); 
-    nfft = max(2^nextpow2(winLength), 1024); %(Δf = Fs/NFFT)
+    nfft = max(2^nextpow2(winLength), 2048); %(Δf = Fs/NFFT)
     
     [pxx, f] = pwelch(ref, win, overlap, nfft, Fs); % FFT of each to get Power -> hamming is a windowing function
 
     % Finding the Powerline Noise Frequency Fundamental Frequency
     idx_fund = f >= 45 & f <= 65;
-    [~, i1] = max(pxx(idx_fund));
-    lineFreqFund = f(idx_fund);
-    lineFreqFund = lineFreqFund(i1);
+    if ~any(idx_fund)
+        lineFreqFund = NaN;
+        lineFreqHarm = NaN;
+        return;
+    end
+    [~, i1]   = max(pxx(idx_fund));
+    candFund  = f(idx_fund);
+    candFund  = candFund(i1);
+
+    % Snap to nearest mains frequency
+    if abs(candFund - 50) < abs(candFund - 60)
+        lineFreqFund = 50;
+    else
+        lineFreqFund = 60;
+    end
 
     % Finding the Harmonics of the Powerline Noise
-    idx_harm = f >= 95 & f <= 125;
-    [~, i2] = max(pxx(idx_harm));
-    lineFreqHarm = f(idx_harm);
-    lineFreqHarm = lineFreqHarm(i2);
+    harmTarget = 2*lineFreqFund;
+    idx_harm   = f >= (harmTarget-5) & f <= (harmTarget+5);
+    if ~any(idx_harm)
+        lineFreqHarm = NaN;
+        return;
+    end
+    [~, i2]    = max(pxx(idx_harm));
+    candHarm   = f(idx_harm);
+    lineFreqHarm = candHarm(i2);
 end
 
     % Notch Filter for Determined Powerline Noise
@@ -49,54 +66,80 @@ function sig_filtered = apply_notch(signal, Fs, lineFreqFund, lineFreqHarm)
     Q = 60;  % notch sharpness (higher = narrower band)
     sig_filtered = zeros(size(signal)); % initializing the output variable
 
-    for ch = 1:size(signal, 1)
-        sig = double(signal(ch,:)); % ensuring type double for iirnotch function
+    haveFund = false;
+    haveHarm = false;
 
-        % Fundamental Frequency Notch
-        if lineFreqFund > 0 && lineFreqFund < Fs/2 % freq cannot be negative and it must be less than half the sampling
-            W0 = lineFreqFund/(Fs/2);
-            BW = W0/Q;
-            [bF, aF] = iirnotch(W0, BW);
+    % Fundamental Frequency Notch
+    if lineFreqFund > 0 && lineFreqFund < Fs/2  % freq cannot be negative and it must be less than half the sampling
+        W0F = lineFreqFund / (Fs/2);  % normalized (0–1, relative to Nyquist)
+        BWF = W0F / Q;
+        [bF, aF] = iirnotch(W0F, BWF);
+        haveFund = true;
+    end
+
+    % Harmonic Frequency Notch
+    if lineFreqHarm > 0 && lineFreqHarm < Fs/2
+        W0H = lineFreqHarm / (Fs/2);
+        BWH = W0H / Q;
+        [bH, aH] = iirnotch(W0H, BWH);
+        haveHarm = true;
+    end
+
+    % Apply filters to each channel
+    for ch = 1:size(signal, 1)
+        sig = double(signal(ch,:));
+        if haveFund
             sig = filtfilt(bF, aF, sig);
         end
-
-        % Harmonic Frequency Notch
-        if lineFreqHarm > 0 && lineFreqHarm < Fs/2
-            W0 = lineFreqHarm/(Fs/2);
-            BW = W0/Q;
-            [bH, aH] = iirnotch(W0, BW);
+        if haveHarm
             sig = filtfilt(bH, aH, sig);
         end
-
-        sig_filtered(ch, :) = sig;
+        sig_filtered(ch,:) = sig;
+    end
         
     % Plotting the Notch Filter Frequency Response
-    [hF, fF] = freqz(bF, aF, 1024, 'half'); % Frequency response for fundamental notch
-    [hH, fH] = freqz(bH, aH, 1024, 'half'); % Frequency response for harmonic notch
+    if haveFund || haveHarm
+        figure;
 
-    figure;
-    subplot(2,1,1); % Create a subplot for magnitude response
-    plot(fF * (Fs / (2 * pi)), 20*log10(abs(hF)), 'LineWidth', 1.5);
-    hold on;
-    plot(fH * (Fs / (2 * pi)), 20*log10(abs(hH)), 'LineWidth', 1.5);
-    grid on;
-    title('Notch Filter Frequency Response - Magnitude');
-    xlabel('Frequency (Hz)');
-    ylabel('Magnitude (dB)');
-    xlim([0 Fs/2]);
-    ylim([-100 5]);
-    legend('Fundamental Notch', 'Harmonic Notch');
+        % Magnitude response
+        subplot(2,1,1);
+        hold on;
+        if haveFund
+            [hF, fF] = freqz(bF, aF, 1024, Fs); % fF in Hz
+            plot(fF, 20*log10(abs(hF)), 'LineWidth', 1.5);
+        end
+        if haveHarm
+            [hH, fH] = freqz(bH, aH, 1024, Fs); % fH in Hz
+            plot(fH, 20*log10(abs(hH)), 'LineWidth', 1.5);
+        end
+        grid on;
+        title('Notch Filter Frequency Response - Magnitude');
+        xlabel('Frequency (Hz)');
+        ylabel('Magnitude (dB)');
+        xlim([0 Fs/2]);
+        ylim([-100 5]);
+        legendStr = {};
+        if haveFund, legendStr{end+1} = 'Fundamental Notch'; end
+        if haveHarm, legendStr{end+1} = 'Harmonic Notch'; end
+        legend(legendStr, 'Location', 'best');
 
-    subplot(2,1,2); % Create a subplot for phase response
-    plot(fF * (Fs / (2 * pi)), unwrap(angle(hF)), 'LineWidth', 1.5);
-    hold on;
-    plot(fH * (Fs / (2 * pi)), unwrap(angle(hH)), 'LineWidth', 1.5);
-    grid on;
-    title('Notch Filter Frequency Response - Phase');
-    xlabel('Frequency (Hz)');
-    ylabel('Phase (radians)');
-    xlim([0 Fs/2]);
-    legend('Fundamental Notch', 'Harmonic Notch');
+        % Phase response
+        subplot(2,1,2);
+        hold on;
+        if haveFund
+            [hF, fF] = freqz(bF, aF, 1024, Fs);
+            plot(fF, unwrap(angle(hF)), 'LineWidth', 1.5);
+        end
+        if haveHarm
+            [hH, fH] = freqz(bH, aH, 1024, Fs);
+            plot(fH, unwrap(angle(hH)), 'LineWidth', 1.5);
+        end
+        grid on;
+        title('Notch Filter Frequency Response - Phase');
+        xlabel('Frequency (Hz)');
+        ylabel('Phase (radians)');
+        xlim([0 Fs/2]);
+        legend(legendStr, 'Location', 'best');
     end
 end
 %% Bandpass Filtering
@@ -139,7 +182,7 @@ outputDir = "Filtered_Data";
 files = dir(fullfile(inputDir, '**', '*.mat'));
 fprintf("Found %d files.\n", numel(files));
 
-for i = 1:3
+for i = 1:numel(files)
     fprintf("\nProcessing %d of %d: %s\n", i, numel(files), files(i).name);
     % 1. Extracting the EEG
     filePath = fullfile(files(i).folder, files(i).name);
@@ -159,7 +202,7 @@ for i = 1:3
     [lineFund, lineHarm] = detect_line_frequency(clean_eeg, Fs);
 
     % 4. Notch Filter for Powerline Noise
-    notch_eeg = apply_notch(clean_eeg, Fs, lineFund, lineHarm);
+    notch_eeg = apply_notch(clean_eeg, Fs, 60, 120);
 
     % 5. Broad Bandpass
     bp_eeg = broad_bandpass(notch_eeg, Fs);

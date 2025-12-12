@@ -27,21 +27,38 @@ function [lineFreqFund, lineFreqHarm] = detect_line_frequency(signal, Fs)
     winLength = min(desiredWin, length(ref));   
     win = hamming(winLength);
     overlap = floor(winLength*0.5); 
-    nfft = max(2^nextpow2(winLength), 1024); %(Δf = Fs/NFFT)
+    nfft = max(2^nextpow2(winLength), 2048); %(Δf = Fs/NFFT)
     
     [pxx, f] = pwelch(ref, win, overlap, nfft, Fs); % FFT of each to get Power -> hamming is a windowing function
 
     % Finding the Powerline Noise Frequency Fundamental Frequency
     idx_fund = f >= 45 & f <= 65;
-    [~, i1] = max(pxx(idx_fund));
-    lineFreqFund = f(idx_fund);
-    lineFreqFund = lineFreqFund(i1);
+    if ~any(idx_fund)
+        lineFreqFund = NaN;
+        lineFreqHarm = NaN;
+        return;
+    end
+    [~, i1]   = max(pxx(idx_fund));
+    candFund  = f(idx_fund);
+    candFund  = candFund(i1);
+
+    % Snap to nearest mains frequency
+    if abs(candFund - 50) < abs(candFund - 60)
+        lineFreqFund = 50;
+    else
+        lineFreqFund = 60;
+    end
 
     % Finding the Harmonics of the Powerline Noise
-    idx_harm = f >= 95 & f <= 125;
-    [~, i2] = max(pxx(idx_harm));
-    lineFreqHarm = f(idx_harm);
-    lineFreqHarm = lineFreqHarm(i2);
+    harmTarget = 2*lineFreqFund;
+    idx_harm   = f >= (harmTarget-5) & f <= (harmTarget+5);
+    if ~any(idx_harm)
+        lineFreqHarm = NaN;
+        return;
+    end
+    [~, i2]    = max(pxx(idx_harm));
+    candHarm   = f(idx_harm);
+    lineFreqHarm = candHarm(i2);
 end
 
     % Notch Filter for Determined Powerline Noise
@@ -70,8 +87,6 @@ function sig_filtered = apply_notch(signal, Fs, lineFreqFund, lineFreqHarm)
 
         sig_filtered(ch, :) = sig;
         
-    end
-end
     % Plotting the Notch Filter Frequency Response
     [hF, fF] = freqz(bF, aF, 1024, 'half'); % Frequency response for fundamental notch
     [hH, fH] = freqz(bH, aH, 1024, 'half'); % Frequency response for harmonic notch
@@ -99,6 +114,8 @@ end
     ylabel('Phase (radians)');
     xlim([0 Fs/2]);
     legend('Fundamental Notch', 'Harmonic Notch');
+    end
+end
 %% Bandpass Filtering
     % Broad Bandpass for Removing Baseline Drift and High Frequency EMG Noise
 function sig_bp = broad_bandpass(signal, Fs)
@@ -139,7 +156,7 @@ outputDir = "Filtered_Data";
 files = dir(fullfile(inputDir, '**', '*.mat'));
 fprintf("Found %d files.\n", numel(files));
 
-for i = 1:3
+for i = 1:numel(files)
     fprintf("\nProcessing %d of %d: %s\n", i, numel(files), files(i).name);
     % 1. Extracting the EEG
     filePath = fullfile(files(i).folder, files(i).name);
@@ -159,7 +176,7 @@ for i = 1:3
     [lineFund, lineHarm] = detect_line_frequency(clean_eeg, Fs);
 
     % 4. Notch Filter for Powerline Noise
-    notch_eeg = apply_notch(clean_eeg, Fs, lineFund, lineHarm);
+    notch_eeg = apply_notch(clean_eeg, Fs, 60, 120);
 
     % 5. Broad Bandpass
     bp_eeg = broad_bandpass(notch_eeg, Fs);
